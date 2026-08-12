@@ -4,13 +4,14 @@ from datetime import datetime
 from app.database.base import Base
 
 
-class User(Base):
-    __tablename__ = "users"
+class Book(Base):
+    __tablename__ = "books"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    first_name: Mapped[str] = mapped_column(String(30))
-    last_name: Mapped[str] = mapped_column(String(30))
-    email: Mapped[str] = mapped_column(String(255), unique=True)
+    title: Mapped[str] = mapped_column(String(100), nullable=False)
+    author: Mapped[str] = mapped_column(String(50), nullable=False)
+    summary: Mapped[str] = mapped_column(String(255), nullable=False)
+    isbn: Mapped[str] = mapped_column(String(13), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
                                                  server_default=func.now())
 

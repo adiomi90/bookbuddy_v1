@@ -16,6 +16,15 @@ async def get_test(db: AsyncSession = Depends(get_db)):
 
 @router.post("/", response_model=UserResponse)
 async def create_user(user: User, db: AsyncSession = Depends(get_db)):
+    existing_user = await db.execute(select(UserModel).where(UserModel.email == user.email))
+    result = existing_user.scalar_one_or_none()
+
+    if result:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"User with email {user.email} already exists"
+        )
+
     db_user = UserModel(
         first_name=user.first_name,
         last_name=user.last_name,
@@ -55,7 +64,6 @@ async def update_user(user_id: int, user_update: UpdateUser, db: AsyncSession = 
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"User with id {user_id} not found")
-    
 
     update_data = user_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -73,8 +81,8 @@ async def delete_user_by_id(user_id: int, db: AsyncSession = Depends(get_db)):
     result = db_user.scalar_one_or_none()
 
     if not result:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                                detail=f"User with id {user_id} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"User with id {user_id} not found")
     await db.delete(result)
     await db.commit()
 
