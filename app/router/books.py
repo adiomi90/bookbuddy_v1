@@ -32,7 +32,6 @@ async def create_book(book: Book, db: AsyncSession = Depends(get_db)):
         publisher=book.publisher,
         publisher_year=book.publisher_year,
         summary=book.summary,
-        quantity=book.quantity
 
     )
 

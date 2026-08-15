@@ -40,7 +40,7 @@ async def create_loan(loan: Loan, db: AsyncSession = Depends(get_db)):
     if book_result.quantity <= 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Insufficient book in stock for book {loan.book_id}"
+            detail=f"Insufficient book in stock for book id {loan.book_id}"
         )
 
     existing_loan = await db.execute(select(LoanModel)
@@ -91,7 +91,7 @@ async def return_loan(loan_id: int, db: AsyncSession = Depends(get_db)):
 
     if loan_query_result.status == "returned":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT,
-                            detail=f"Loan id {loan_id} can't be returned")
+                            detail=f"Loan id {loan_id} already returned")
 
     book_query = await db.execute(select(BookModel).where(BookModel.id == loan_query_result.book_id))
     book_query_result = book_query.scalar_one_or_none()
@@ -157,6 +157,16 @@ async def get_loans(db: AsyncSession = Depends(get_db)):
     query_result = db_query.scalars().all()
     return query_result
 
+@router.get("/overdue", response_model=list[LoanResponse])
+async def get_overdue_loans(db: AsyncSession = Depends(get_db)):
+    db_query = await db.execute(select(LoanModel).options(
+        selectinload(LoanModel.book),
+        selectinload(LoanModel.user)
+    ).filter(LoanModel.status == "overdue"))
+
+    query_result = db_query.scalars().all()
+    return query_result
+
 
 @router.get("/{loan_id}", response_model=LoanResponse)
 async def get_loan(loan_id: int, db: AsyncSession = Depends(get_db)):
@@ -172,3 +182,5 @@ async def get_loan(loan_id: int, db: AsyncSession = Depends(get_db)):
                             detail=f"loan id {loan_id} does not exist")
 
     return query_result
+
+
