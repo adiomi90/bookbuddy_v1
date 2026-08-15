@@ -9,7 +9,6 @@ class Book(BaseModel):
     summary: str
     publisher: str
     publisher_year: int
-    quantity: int
 
 
 class UpdateBook(BaseModel):
@@ -17,6 +16,10 @@ class UpdateBook(BaseModel):
     author: str | None = None
     isbn: str | None = None
     summary: str | None = None
+
+
+class UpdateInventory(BaseModel):
+    change: int
 
 
 class BookResponse(BaseModel):
@@ -29,5 +32,6 @@ class BookResponse(BaseModel):
     publisher_year: int
     created_at: datetime
     updated_at: datetime
+    quantity: int
 
     model_config = ConfigDict(from_attributes=True)

@@ -3,7 +3,7 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_db
-from app.schemas.user import User, UserResponse, UpdateUser
+from app.schemas.user import User, UserResponse, UserUpdate
 from app.models.user import User as UserModel
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -57,14 +57,25 @@ async def get_user_by_id(user_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{user_id}", response_model=UserResponse)
-async def update_user(user_id: int, user_update: UpdateUser, db: AsyncSession = Depends(get_db)):
+async def update_user(user_id: int, user_update: UserUpdate, db: AsyncSession = Depends(get_db)):
     db_user = await db.execute(select(UserModel).where(UserModel.id == user_id))
     result = db_user.scalar_one_or_none()
 
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"User with id {user_id} not found")
+    
+    if user_update.email is not None:
+        existing_email = await db.execute(select(UserModel)
+                                          .where(UserModel.email == user_update.email,
+                                                    UserModel.id != user_id))
+        result_existing_email = existing_email.scalar_one_or_none()       
 
+        if result_existing_email:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                    detail=f"Another user with {user_update.email} already exists")
+    
+     
     update_data = user_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(result, field, value)
@@ -73,17 +84,3 @@ async def update_user(user_id: int, user_update: UpdateUser, db: AsyncSession = 
     await db.refresh(result)
 
     return result
-
-
-@router.delete("/{user_id}")
-async def delete_user_by_id(user_id: int, db: AsyncSession = Depends(get_db)):
-    db_user = await db.execute(select(UserModel).where(UserModel.id == user_id))
-    result = db_user.scalar_one_or_none()
-
-    if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"User with id {user_id} not found")
-    await db.delete(result)
-    await db.commit()
-
-    return {"message": f"User with id: {user_id} deleted successfully"}

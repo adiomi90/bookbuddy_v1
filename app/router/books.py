@@ -3,7 +3,7 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_db
-from app.schemas.book import Book, BookResponse, UpdateBook
+from app.schemas.book import Book, BookResponse, UpdateBook, UpdateInventory
 from app.models.book import Book as BookModel
 
 router = APIRouter(prefix="/books", tags=["books"])
@@ -22,7 +22,7 @@ async def create_book(book: Book, db: AsyncSession = Depends(get_db)):
     if result:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Book with title {book.title} and {book.isbn} already exits"
+            detail=f"Book with title {book.title} and {book.isbn} already exists"
         )
 
     db_book = BookModel(
@@ -43,34 +43,47 @@ async def create_book(book: Book, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/", response_model=list[BookResponse])
-async def get_user(db: AsyncSession = Depends(get_db)):
-    db_users = await db.execute(select(BookModel))
-    results = db_users.scalars().all()
+async def get_all_books(db: AsyncSession = Depends(get_db)):
+    db_books = await db.execute(select(BookModel))
+    results = db_books.scalars().all()
 
     return results
 
 
-@router.get("/{user_id}", response_model=BookResponse)
-async def get_user_by_id(user_id: int, db: AsyncSession = Depends(get_db)):
-    db_user = await db.execute(select(BookModel).where(BookModel.id == user_id))
-    result = db_user.scalar_one_or_none()
+@router.get("/{book_id}", response_model=BookResponse)
+async def get_book_by_id(book_id: int, db: AsyncSession = Depends(get_db)):
+    db_book = await db.execute(select(BookModel).where(BookModel.id == book_id))
+    result = db_book.scalar_one_or_none()
 
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"User with id {user_id} not found")
+                            detail=f"Book with id {book_id} not found")
     return result
 
 
-@router.patch("/{user_id}", response_model=BookResponse)
-async def update_user(book_id: int, user_update: UpdateBook, db: AsyncSession = Depends(get_db)):
-    db_user = await db.execute(select(BookModel).where(BookModel.id == book_id))
-    result = db_user.scalar_one_or_none()
+@router.patch("/{book_id}", response_model=BookResponse)
+async def update_book(book_id: int, update_book: UpdateBook, db: AsyncSession = Depends(get_db)):
+    db_book = await db.execute(select(BookModel).where(BookModel.id == book_id))
+    result = db_book.scalar_one_or_none()
 
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Book with id {book_id} not found")
 
-    update_data = user_update.model_dump(exclude_unset=True)
+    if update_book.isbn is not None:
+        existing_isbn = await db.execute(select(BookModel).where(
+            BookModel.isbn == update_book.isbn,
+            BookModel.id != book_id
+        )
+        )
+        result_existing_isbn = existing_isbn.scalar_one_or_none()
+
+        if result_existing_isbn:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Another book with ISBN {update_book.isbn} already exists"
+            )
+    update_data = update_book.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(result, field, value)
 
@@ -80,15 +93,21 @@ async def update_user(book_id: int, user_update: UpdateBook, db: AsyncSession = 
     return result
 
 
-@router.delete("/{user_id}")
-async def delete_user_by_id(book_id: int, db: AsyncSession = Depends(get_db)):
-    db_book = await db.execute(select(BookModel).where(BookModel.id == book_id))
-    result = db_book.scalar_one_or_none()
+@router.patch("/{book_id}/inventory", response_model=BookResponse)
+async def update_quantity(book_id: int, update_inventory: UpdateInventory,  db: AsyncSession = Depends(get_db)):
+    db_query = await db.execute(select(BookModel).where(BookModel.id == book_id))
+    result_query = db_query.scalar_one_or_none()
 
-    if not result:
+    if not result_query:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"User with id {book_id} not found")
-    await db.delete(result)
-    await db.commit()
+                            detail=f"Book id {book_id} does not exist")
 
-    return {"message": f"User with id: {book_id} deleted successfully"}
+    new_quantity = result_query.quantity + update_inventory.change
+    if new_quantity < 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"quantity can not be less than 0 - {new_quantity}")
+
+    result_query.quantity = new_quantity
+    await db.commit()
+    await db.refresh(result_query)
+    return result_query
