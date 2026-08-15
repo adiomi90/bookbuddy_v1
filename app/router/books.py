@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_db
 from app.schemas.book import Book, BookResponse, UpdateBook
-from app.models.books import Book as BookModel
+from app.models.book import Book as BookModel
 
 router = APIRouter(prefix="/books", tags=["books"])
 
@@ -29,7 +29,11 @@ async def create_book(book: Book, db: AsyncSession = Depends(get_db)):
         title=book.title,
         author=book.author,
         isbn=book.isbn,
-        summary=book.summary
+        publisher=book.publisher,
+        publisher_year=book.publisher_year,
+        summary=book.summary,
+        quantity=book.quantity
+
     )
 
     db.add(db_book)

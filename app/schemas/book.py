@@ -7,6 +7,9 @@ class Book(BaseModel):
     author: str
     isbn: str
     summary: str
+    publisher: str
+    publisher_year: int
+    quantity: int
 
 
 class UpdateBook(BaseModel):
@@ -22,6 +25,8 @@ class BookResponse(BaseModel):
     author: str
     isbn: str
     summary: str
+    publisher: str
+    publisher_year: int
     created_at: datetime
     updated_at: datetime
 
