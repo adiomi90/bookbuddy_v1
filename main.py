@@ -5,7 +5,7 @@ from app.router.users import router as user_router
 from app.router.books import router as book_router
 from app.router.loans import router as loan_router
 from app.scheduled_task.scheduler import scheduler
-
+from app.router.auth import router as auth_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,3 +20,4 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(user_router)
 app.include_router(book_router)
 app.include_router(loan_router)
+app.include_router(auth_router)

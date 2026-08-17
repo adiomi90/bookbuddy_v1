@@ -8,8 +8,8 @@ from app.schemas.loan import Loan, LoanResponse, LoanUpdate
 from app.models.loan import Loan as LoanModel
 from app.models.book import Book as BookModel
 from app.models.user import User as UserModel
+from app.security.security import get_current_user, get_current_admin
 from datetime import datetime, timezone
-
 
 router = APIRouter(prefix="/loans", tags=["loans"])
 
@@ -20,15 +20,9 @@ async def get_test(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/", response_model=LoanResponse)
-async def create_loan(loan: Loan, db: AsyncSession = Depends(get_db)):
-    user_query = await db.execute(select(UserModel).where(UserModel.id == loan.user_id))
-    user = user_query.scalar_one_or_none()
+async def create_loan(loan: Loan, db: AsyncSession = Depends(get_db),
+                      current_user: UserModel = Depends(get_current_user)):
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User {loan.user_id} does not exist"
-        )
     book_query = await db.execute(select(BookModel).where(BookModel.id == loan.book_id))
     book = book_query.scalar_one_or_none()
 
@@ -46,24 +40,24 @@ async def create_loan(loan: Loan, db: AsyncSession = Depends(get_db)):
     existing_loan_query = await db.execute(
         select(LoanModel)
         .where(
-            LoanModel.user_id == loan.user_id,
+            LoanModel.user_id == current_user.id,
             LoanModel.book_id == loan.book_id,
             LoanModel.status == "borrowed"
-            )
         )
-    
+    )
+
     existing_loan = existing_loan_query.scalar_one_or_none()
 
     if existing_loan:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"User {loan.user_id} already has active loan for  {loan.book_id}"
+            detail=f"User {current_user.id} already has active loan for  {loan.book_id}"
         )
 
     book.quantity -= 1
 
     new_loan = LoanModel(
-        user_id=loan.user_id,
+        user_id=current_user.id,
         book_id=loan.book_id,
         due_date=loan.due_date
     )
@@ -84,15 +78,16 @@ async def create_loan(loan: Loan, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{loan_id}/return", response_model=LoanResponse)
-async def return_loan(loan_id: int, db: AsyncSession = Depends(get_db)):
+async def return_loan(loan_id: int, db: AsyncSession = Depends(get_db),
+                      current_admin: UserModel = Depends(get_current_admin)):
     loan_query = await db.execute(
-                        select(LoanModel)
-                        .options(
-                            selectinload(LoanModel.user),
-                            selectinload(LoanModel.book)    
-                                 )
-                        .where(LoanModel.id == loan_id))
-    
+        select(LoanModel)
+        .options(
+            selectinload(LoanModel.user),
+            selectinload(LoanModel.book)
+        )
+        .where(LoanModel.id == loan_id))
+
     loan = loan_query.scalar_one_or_none()
 
     if not loan:
@@ -104,7 +99,7 @@ async def return_loan(loan_id: int, db: AsyncSession = Depends(get_db)):
                             detail=f"Loan id {loan_id} already returned")
 
     book = loan.book
-    
+
     if not book:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Book id {loan.book_id} can't be returned")
@@ -121,7 +116,8 @@ async def return_loan(loan_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{loan_id}", response_model=LoanResponse)
-async def update_duedate(loan_id: int, loan_update: LoanUpdate, db: AsyncSession = Depends(get_db)):
+async def update_duedate(loan_id: int, loan_update: LoanUpdate, db: AsyncSession = Depends(get_db),
+                         current_admin: UserModel = Depends(get_current_admin)):
     loan_query = await db.execute(
         select(LoanModel)
         .options(
@@ -129,7 +125,7 @@ async def update_duedate(loan_id: int, loan_update: LoanUpdate, db: AsyncSession
             selectinload(LoanModel.book)
         )
         .where(LoanModel.id == loan_id))
-    
+
     loan = loan_query.scalar_one_or_none()
 
     if not loan:
@@ -149,13 +145,13 @@ async def update_duedate(loan_id: int, loan_update: LoanUpdate, db: AsyncSession
     await db.commit()
 
     loan_query = await db.execute(
-    select(LoanModel)
-    .options(
-        selectinload(LoanModel.user),
-        selectinload(LoanModel.book)
+        select(LoanModel)
+        .options(
+            selectinload(LoanModel.user),
+            selectinload(LoanModel.book)
+        )
+        .where(LoanModel.id == loan_id)
     )
-    .where(LoanModel.id == loan_id)
-)
 
     loan = loan_query.scalar_one()
 
@@ -163,48 +159,58 @@ async def update_duedate(loan_id: int, loan_update: LoanUpdate, db: AsyncSession
 
 
 @router.get("/", response_model=list[LoanResponse])
-async def get_loans(db: AsyncSession = Depends(get_db)):
-    loans_query = await db.execute(select(LoanModel).options(
+async def get_loans(db: AsyncSession = Depends(get_db),
+                    current_user: UserModel = Depends(get_current_user)):
+    query = select(LoanModel).options(
         selectinload(LoanModel.user),
-        selectinload(LoanModel.book))
+        selectinload(LoanModel.book)
     )
 
-    loans = loans_query.scalars().all()
+    if not current_user.is_admin:
+        query = query.where(LoanModel.user_id == current_user.id)
+
+    query = await db.execute(query)
+    loans = query.scalars().all()
+
     return loans
 
 
 @router.get("/overdue", response_model=list[LoanResponse])
-async def get_overdue_loans(db: AsyncSession = Depends(get_db)):
-    overdue_query = await db.execute(select(LoanModel).options(
+async def get_overdue_loans(db: AsyncSession = Depends(get_db),
+                            current_user: UserModel = Depends(get_current_user)):
+    query = select(LoanModel).options(
         selectinload(LoanModel.book),
         selectinload(LoanModel.user)
-    ).filter(LoanModel.status == "overdue"))
+    ).filter(LoanModel.status == "overdue")
 
-    overdue_loans = overdue_query.scalars().all()
+    if not current_user.is_admin:
+        query = query.where(LoanModel.user_id == current_user.id)
+
+    query = await db.execute(query)
+    overdue_loans = query.scalars().all()
+
     return overdue_loans
 
 
 @router.get("/user/{user_id}", response_model=list[LoanResponse])
-async def get_loans_for_user(user_id: int, db: AsyncSession = Depends(get_db)):
-    user_query = await db.execute(select(UserModel).where(UserModel.id == user_id))
-    user = user_query.scalar_one_or_none()
+async def get_loans_for_user(user_id: int, db: AsyncSession = Depends(get_db),
+                             current_admin: UserModel = Depends(get_current_admin)):
 
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"User id {user_id} does not exist")
-
-    user_loan_query = await db.execute(select(LoanModel).options(
+    query = select(LoanModel).options(
         selectinload(LoanModel.user),
-        selectinload(LoanModel.book)
-    ).filter(LoanModel.user_id == user_id))
+        selectinload(LoanModel.book)).where(
+            LoanModel.user_id == user_id
+    )
 
-    user_loans = user_loan_query.scalars().all()
+    query = await db.execute(query)
+    loans = query.scalars().all()
 
-    return user_loans
+    return loans
 
 
-@router.get("/{loan_id}", response_model=LoanResponse)
-async def get_loan(loan_id: int, db: AsyncSession = Depends(get_db)):
+@router.get("/{loan_id}", response_model=LoanResponse,)
+async def get_loan(loan_id: int, db: AsyncSession = Depends(get_db),
+                   current_admin: UserModel = Depends(get_current_admin)):
     loan_query = await db.execute(select(LoanModel).options(
         selectinload(LoanModel.book),
         selectinload(LoanModel.user)

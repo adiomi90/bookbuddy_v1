@@ -3,19 +3,21 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_db
-from app.schemas.user import User, UserResponse, UserUpdate
+from app.schemas.user import User, UserResponse, UserUpdate, AdminUserCreate
 from app.models.user import User as UserModel
+from app.security.security import get_current_user, get_current_admin, hash_password
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.get("/db-test")
-async def get_test(db: AsyncSession = Depends(get_db)):
-    return {"database": "connected"}
+async def get_test(current_user: UserModel = Depends(get_current_user)):
+    return {"message": "authenticated"}
 
 
 @router.post("/", response_model=UserResponse)
-async def create_user(user: User, db: AsyncSession = Depends(get_db)):
+async def create_user(user: AdminUserCreate, current_admin: UserModel = Depends(get_current_admin),
+                      db: AsyncSession = Depends(get_db)):
     existing_user = await db.execute(select(UserModel).where(UserModel.email == user.email))
     result = existing_user.scalar_one_or_none()
 
@@ -28,7 +30,8 @@ async def create_user(user: User, db: AsyncSession = Depends(get_db)):
     db_user = UserModel(
         first_name=user.first_name,
         last_name=user.last_name,
-        email=user.email
+        email=user.email,
+        password_hash=hash_password(user.password)
     )
 
     db.add(db_user)
@@ -64,18 +67,17 @@ async def update_user(user_id: int, user_update: UserUpdate, db: AsyncSession = 
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"User with id {user_id} not found")
-    
+
     if user_update.email is not None:
         existing_email = await db.execute(select(UserModel)
                                           .where(UserModel.email == user_update.email,
-                                                    UserModel.id != user_id))
-        result_existing_email = existing_email.scalar_one_or_none()       
+                                                 UserModel.id != user_id))
+        result_existing_email = existing_email.scalar_one_or_none()
 
         if result_existing_email:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,
-                                    detail=f"Another user with {user_update.email} already exists")
-    
-     
+                                detail=f"Another user with {user_update.email} already exists")
+
     update_data = user_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(result, field, value)

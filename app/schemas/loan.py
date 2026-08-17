@@ -6,7 +6,6 @@ from enum import Enum
 
 
 class Loan(BaseModel):
-    user_id: int
     book_id: int
     due_date: datetime
 

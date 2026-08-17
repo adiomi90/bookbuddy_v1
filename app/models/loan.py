@@ -14,7 +14,6 @@ class Loan(Base):
         ForeignKey("books.id"), nullable=False)
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="borrowed")
-
     due_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False)
     returned_date: Mapped[datetime | None] = mapped_column(

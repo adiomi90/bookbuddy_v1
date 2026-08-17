@@ -14,6 +14,10 @@ class UserUpdate(BaseModel):
     email: EmailStr | None = None
 
 
+class UserRegistration(User):
+    password: str
+
+
 class UserResponse(BaseModel):
     id: int
     first_name: str
@@ -23,3 +27,7 @@ class UserResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AdminUserCreate(UserRegistration):
+    pass
