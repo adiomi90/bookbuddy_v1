@@ -10,9 +10,9 @@ class LoanDuration(int, Enum):
     FIFTEEN_DAYS = 15
     THIRTY_DAYS = 30
 
+
 class Loan(BaseModel):
     book_id: int
-    user_id: int
     duration: LoanDuration
 
 
@@ -20,8 +20,6 @@ class LoanStatus(str, Enum):
     BORROWED = "borrowed"
     RETURNED = "returned"
     OVERDUE = "overdue"
-
-
 
 
 class LoanUpdate(BaseModel):

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 from fastapi import Depends
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_db
@@ -142,12 +142,27 @@ async def create_loan(user_id: int, loan: Loan, db: AsyncSession = Depends(get_d
     if existing_loan:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"User {user_id} already has active loan for  {loan.book_id}"
+            detail=f"User {user_id} already has active loan for book {loan.book_id}"
         )
 
     book.quantity -= 1
 
     duedate = datetime.now(timezone.utc) + timedelta(days=loan.duration)
+
+    five_or_more_active_loans_query = await db.execute(
+        select(LoanModel)
+        .where(LoanModel.user_id == user_id,
+               or_(
+                   LoanModel.status == "borrowed",
+                   LoanModel.status == "overdue"
+               )
+               )
+    )
+
+    five_or_more_active_loans = five_or_more_active_loans_query.scalars().all()
+    if len(five_or_more_active_loans) >= 5:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=f"User {user_id} already has 5 loans")
 
     new_loan = LoanModel(
         user_id=user_id,
