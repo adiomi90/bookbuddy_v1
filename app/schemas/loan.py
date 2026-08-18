@@ -5,15 +5,23 @@ from app.schemas.user import UserResponse
 from enum import Enum
 
 
+class LoanDuration(int, Enum):
+    SEVEN_DAYS = 7
+    FIFTEEN_DAYS = 15
+    THIRTY_DAYS = 30
+
 class Loan(BaseModel):
     book_id: int
-    due_date: datetime
+    user_id: int
+    duration: LoanDuration
 
 
 class LoanStatus(str, Enum):
-    borrowed = "borrowed"
-    returned = "returned"
-    overdue = "overdue"
+    BORROWED = "borrowed"
+    RETURNED = "returned"
+    OVERDUE = "overdue"
+
+
 
 
 class LoanUpdate(BaseModel):
@@ -24,7 +32,7 @@ class LoanResponse(BaseModel):
     id: int
     user: UserResponse
     book: BookResponse
-    status: str
+    status: LoanStatus
     due_date: datetime
     returned_date: datetime | None = None
     borrowed_date: datetime

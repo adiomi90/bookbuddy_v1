@@ -86,3 +86,5 @@ async def update_user(user_id: int, user_update: UserUpdate, db: AsyncSession = 
     await db.refresh(result)
 
     return result
+
+
