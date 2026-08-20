@@ -3,7 +3,7 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_db
-from app.schemas.user import User, UserResponse, UserUpdate, AdminUserCreate
+from app.schemas.user import User, UserResponse, UserUpdate, AdminUserCreate, UserUpdateAdmin
 from app.models.user import User as UserModel
 from app.security.security import get_current_user, get_current_admin, hash_password
 
@@ -41,7 +41,8 @@ async def create_user(user: AdminUserCreate, current_admin: UserModel = Depends(
 
 
 @router.get("/", response_model=list[UserResponse])
-async def get_user(db: AsyncSession = Depends(get_db)):
+async def get_all_users(db: AsyncSession = Depends(get_db),
+                        current_admin: UserModel = Depends(get_current_admin)):
     db_users = await db.execute(select(UserModel))
     results = db_users.scalars().all()
 
@@ -49,7 +50,8 @@ async def get_user(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{user_id}", response_model=UserResponse)
-async def get_user_by_id(user_id: int, db: AsyncSession = Depends(get_db)):
+async def get_user_by_id(user_id: int, db: AsyncSession = Depends(get_db),
+                         current_admin: UserModel = Depends(get_current_admin)):
     db_user = await db.execute(select(UserModel).where(UserModel.id == user_id))
     result = db_user.scalar_one_or_none()
 
@@ -59,8 +61,36 @@ async def get_user_by_id(user_id: int, db: AsyncSession = Depends(get_db)):
     return result
 
 
+@router.patch("/me", response_model=UserResponse)
+async def update_my_profile(user_update: UserUpdate, db: AsyncSession = Depends(get_db),
+                            current_user: UserModel = Depends(get_current_user)):
+
+    if user_update.email is not None:
+        existing_email = await db.execute(select(UserModel)
+                                          .where(UserModel.email == user_update.email,
+                                                 UserModel.id != current_user.id))
+        result_existing_email = existing_email.scalar_one_or_none()
+
+        if result_existing_email:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail=f"Another user with {user_update.email} already exists")
+
+    update_data = user_update.model_dump(exclude_unset=True)
+    if "password" in update_data:
+        current_user.password_hash = hash_password(update_data.pop("password"))
+
+    for field, value in update_data.items():
+        setattr(current_user, field, value)
+
+    await db.commit()
+    await db.refresh(current_user)
+
+    return current_user
+
+
 @router.patch("/{user_id}", response_model=UserResponse)
-async def update_user(user_id: int, user_update: UserUpdate, db: AsyncSession = Depends(get_db)):
+async def admin_update_user(user_id: int, user_update: UserUpdateAdmin, db: AsyncSession = Depends(get_db),
+                            current_admin: UserModel = Depends(get_current_admin)):
     db_user = await db.execute(select(UserModel).where(UserModel.id == user_id))
     result = db_user.scalar_one_or_none()
 
@@ -86,5 +116,3 @@ async def update_user(user_id: int, user_update: UserUpdate, db: AsyncSession = 
     await db.refresh(result)
 
     return result
-
-

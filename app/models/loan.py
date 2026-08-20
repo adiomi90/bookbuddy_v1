@@ -2,6 +2,7 @@ from sqlalchemy import String, DateTime, func, ForeignKey, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from app.database.base import Base
+from app.models.book import Book
 
 
 class Loan(Base):

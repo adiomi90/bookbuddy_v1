@@ -19,7 +19,7 @@ async def get_test(db: AsyncSession = Depends(get_db)):
     return {"database": "connected"}
 
 
-@router.get("/", response_model=list[LoanResponse])
+@router.get("/me", response_model=list[LoanResponse])
 async def get_loans(db: AsyncSession = Depends(get_db),
                     current_user: UserModel = Depends(get_current_user)):
     query = select(LoanModel).options(
@@ -51,20 +51,6 @@ async def get_overdue_loans(db: AsyncSession = Depends(get_db),
     overdue_loans = query.scalars().all()
 
     return overdue_loans
-
-
-@router.get("/me", response_model=list[LoanResponse])
-async def get_all_loans(db: AsyncSession = Depends(get_db),
-                        current_user: UserModel = Depends(get_current_user)):
-    loans_query = await db.execute(select(LoanModel).options(
-        selectinload(LoanModel.user),
-        selectinload(LoanModel.book)
-    ).where(
-        LoanModel.user_id == current_user.id
-    ))
-
-    loans = loans_query.scalars().all()
-    return loans
 
 
 @router.get("/user/{user_id}", response_model=list[LoanResponse])

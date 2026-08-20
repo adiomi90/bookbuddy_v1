@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_db
 from app.schemas.book import Book, BookResponse, UpdateBook, UpdateInventory
 from app.models.book import Book as BookModel
+from app.models.user import User as UserModel
+from app.security.security import get_current_admin
 
 router = APIRouter(prefix="/books", tags=["books"])
 
@@ -15,7 +17,8 @@ async def get_test(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/", response_model=BookResponse)
-async def create_book(book: Book, db: AsyncSession = Depends(get_db)):
+async def create_book(book: Book, db: AsyncSession = Depends(get_db),
+                      current_admin: UserModel = Depends(get_current_admin)):
     existing_book = await db.execute(select(BookModel).where(BookModel.isbn == book.isbn))
     result = existing_book.scalar_one_or_none()
 
@@ -49,7 +52,8 @@ async def get_all_books(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{book_id}", response_model=BookResponse)
-async def get_book_by_id(book_id: int, db: AsyncSession = Depends(get_db)):
+async def get_book_by_id(book_id: int, db: AsyncSession = Depends(get_db),
+                         current_admin: UserModel = Depends(get_current_admin)):
     db_book = await db.execute(select(BookModel).where(BookModel.id == book_id))
     result = db_book.scalar_one_or_none()
 
@@ -60,7 +64,8 @@ async def get_book_by_id(book_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{book_id}", response_model=BookResponse)
-async def update_book(book_id: int, update_book: UpdateBook, db: AsyncSession = Depends(get_db)):
+async def update_book(book_id: int, update_book: UpdateBook, db: AsyncSession = Depends(get_db),
+                      current_admin: UserModel = Depends(get_current_admin)):
     db_book = await db.execute(select(BookModel).where(BookModel.id == book_id))
     result = db_book.scalar_one_or_none()
 
@@ -92,7 +97,9 @@ async def update_book(book_id: int, update_book: UpdateBook, db: AsyncSession = 
 
 
 @router.patch("/{book_id}/inventory", response_model=BookResponse)
-async def update_quantity(book_id: int, update_inventory: UpdateInventory,  db: AsyncSession = Depends(get_db)):
+async def update_quantity(book_id: int, update_inventory: UpdateInventory,
+                          db: AsyncSession = Depends(get_db),
+                          current_admin: UserModel = Depends(get_current_admin)):
     db_query = await db.execute(select(BookModel).where(BookModel.id == book_id))
     result_query = db_query.scalar_one_or_none()
 

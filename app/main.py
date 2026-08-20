@@ -7,9 +7,10 @@ from app.router.loans import router as loan_router
 from app.scheduled_task.scheduler import scheduler
 from app.router.auth import router as auth_router
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    #schedular to check for due_date
+    # schedular to check for due_date
     scheduler.start()
     await init_db()
     yield
