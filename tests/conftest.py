@@ -3,8 +3,9 @@ import os
 import pytest
 import pytest_asyncio
 from dotenv import load_dotenv
-from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.pool import NullPool
 from datetime import datetime, timezone, timedelta
 
 from app.database.database import get_db
@@ -19,32 +20,38 @@ from app.security.security import hash_password
 load_dotenv()
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
+#url not founc
+assert TEST_DATABASE_URL
 
-
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="function")
 async def test_engine():
-    engine = create_async_engine(TEST_DATABASE_URL)
+    engine = create_async_engine(
+        TEST_DATABASE_URL,
+        # Prevent asyncpg connections from being reused
+        # across different event loops during tests.
+        poolclass=NullPool)
 
     yield engine
 
     await engine.dispose()
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="function")
 async def init_test_db(test_engine):
     async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-
     yield
 
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 def test_session_factory(test_engine):
     return async_sessionmaker(
         bind=test_engine,
+        class_=AsyncSession,
         expire_on_commit=False
     )
 
@@ -52,16 +59,22 @@ def test_session_factory(test_engine):
 @pytest_asyncio.fixture
 async def override_get_db(test_session_factory):
     async def _override_get_db():
-        async with test_session_factory() as db:
-            yield db
+        async with test_session_factory() as session:
+            yield session
 
     return _override_get_db
 
 
-@pytest.fixture
-def client(override_get_db):
+@pytest_asyncio.fixture
+async def async_client(override_get_db):
     app.dependency_overrides[get_db] = override_get_db
-    return TestClient(app)
+
+
+    async with AsyncClient(transport=ASGITransport(app=app),
+                            base_url="http://testserver") as test_client:
+        yield test_client
+
+    app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture
@@ -76,6 +89,7 @@ async def test_user(init_test_db, test_session_factory):
         )
 
         db.add(user)
+
         await db.commit()
         await db.refresh(user)
 
