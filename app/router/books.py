@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, status
 from fastapi import Depends
-from sqlalchemy import select
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_db
 from app.schemas.book import Book, BookResponse, UpdateBook, UpdateInventory
+from app.schemas.loan import PaginationResponse
 from app.models.book import Book as BookModel
 from app.models.user import User as UserModel
 from app.security.security import get_current_admin
@@ -43,12 +44,76 @@ async def create_book(book: Book, db: AsyncSession = Depends(get_db),
     return db_book
 
 
-@router.get("/", response_model=list[BookResponse])
-async def get_all_books(db: AsyncSession = Depends(get_db)):
-    db_books = await db.execute(select(BookModel))
-    results = db_books.scalars().all()
+@router.get("/", response_model=PaginationResponse[BookResponse])
+async def get_all_books(
+        skip: int = 0,
+        limit: int = 20,
+        available_only: bool = False,
+        db: AsyncSession = Depends(get_db)):
 
-    return results
+    query = select(BookModel)
+    if available_only:
+        query = query.where(BookModel.quantity > 0)
+
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+
+    pagination_query = query.offset(skip).limit(limit)
+    result = await db.execute(pagination_query)
+    books = result.scalars().all()
+
+    return PaginationResponse(
+        items=books,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
+
+
+@router.get("/search", response_model=PaginationResponse[BookResponse])
+async def search_books(
+    q: str = "",
+    skip: int = 0,
+    limit: int = 20,
+    available_only: bool = False,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+        Search for books by title, authoer, ISBN,
+        q: search query (searches in title, author, isbn)
+        available_only: if True, only reutrn books with quantity > 0
+    """
+
+    query = select(BookModel)
+
+    if q:
+        search_pattern = f"%{q}%"
+        query = query.where(
+            or_(
+                BookModel.title.ilike(search_pattern),
+                BookModel.author.ilike(search_pattern),
+                BookModel.isbn.ilike(search_pattern)
+            )
+        )
+
+    if available_only:
+        query = query.where(BookModel.quantity > 0)
+
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+
+    pagination_query = query.offset(skip).limit(limit)
+    result = await db.execute(pagination_query)
+    books = result.scalars().all()
+
+    return PaginationResponse(
+        items=books,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
 
 
 @router.get("/{book_id}", response_model=BookResponse)
