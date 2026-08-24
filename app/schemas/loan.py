@@ -3,6 +3,16 @@ from datetime import datetime
 from app.schemas.book import BookResponse
 from app.schemas.user import UserResponse
 from enum import Enum
+from typing import Generic, TypeVar, List
+
+T = TypeVar("T")
+
+
+class PaginationResponse(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+    skip: int
+    limit: int
 
 
 class LoanDuration(int, Enum):

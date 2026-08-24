@@ -1,17 +1,33 @@
 from app.database.database import SessionLocal
 from app.models.loan import Loan as LoanModel
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import select
+from sqlalchemy.exc import ProgrammingError
 
 
 async def check_overdue_loans():
-    async with SessionLocal() as db:
-        query = await db.execute(select(LoanModel)
-                                 .where(LoanModel.status == "borrowed",
-                                        LoanModel.due_date < datetime.now()))
+    try:
+        async with SessionLocal() as db:
+            now = datetime.now(timezone.utc)
+            query = await db.execute(
+                select(LoanModel)
+                .where(
+                    LoanModel.status == "borrowed",
+                    LoanModel.due_date < now
+                )
+            )
 
-        over_due_loans = query.scalars()
-        for over_due_loan in over_due_loans:
-            over_due_loan.status = "overdue"
+            overdue_loans = query.scalars().all()
 
-        await db.commit()
+            for loan in overdue_loans:
+                loan.status = "overdue"
+
+            if overdue_loans:
+                await db.commit()
+                print(f"Scheduler: Marked {len(overdue_loans)} loans as overdue")
+            else:
+                print("Scheler: No overdue loans found.")
+    except ProgrammingError as e:
+        print(f"Database not ready or tables missing(Schehler will retry later)")
+    except Exception as e:
+        print(f"Unexcpted error in check_overdue_loans: {e}")

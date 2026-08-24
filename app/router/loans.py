@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException, status
 from fastapi import Depends
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_db
-from app.schemas.loan import Loan, LoanResponse, LoanUpdate, LoanDuration
+from app.schemas.loan import Loan, LoanResponse, LoanUpdate, LoanDuration, PaginationResponse
 from app.models.loan import Loan as LoanModel
 from app.models.book import Book as BookModel
 from app.models.user import User as UserModel
@@ -19,8 +19,10 @@ async def get_test(db: AsyncSession = Depends(get_db)):
     return {"database": "connected"}
 
 
-@router.get("/me", response_model=list[LoanResponse])
-async def get_loans(db: AsyncSession = Depends(get_db),
+@router.get("/me", response_model=PaginationResponse[LoanResponse])
+async def get_loans(skip: int = 0,
+                    limit: int = 20,
+                    db: AsyncSession = Depends(get_db),
                     current_user: UserModel = Depends(get_current_user)):
     query = select(LoanModel).options(
         selectinload(LoanModel.user),
@@ -30,14 +32,26 @@ async def get_loans(db: AsyncSession = Depends(get_db),
     if not current_user.is_admin:
         query = query.where(LoanModel.user_id == current_user.id)
 
-    query = await db.execute(query)
-    loans = query.scalars().all()
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
 
-    return loans
+    pagination_query = query.offset(skip).limit(limit)
+    result = await db.execute(pagination_query)
+    loans = result.scalars().all()
+
+    return PaginationResponse(
+        items=loans,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
 
 
-@router.get("/overdue", response_model=list[LoanResponse])
-async def get_overdue_loans(db: AsyncSession = Depends(get_db),
+@router.get("/overdue", response_model=PaginationResponse[LoanResponse])
+async def get_overdue_loans(skip: int = 0,
+                            limit: int = 20,
+                            db: AsyncSession = Depends(get_db),
                             current_user: UserModel = Depends(get_current_user)):
     query = select(LoanModel).options(
         selectinload(LoanModel.book),
@@ -47,14 +61,27 @@ async def get_overdue_loans(db: AsyncSession = Depends(get_db),
     if not current_user.is_admin:
         query = query.where(LoanModel.user_id == current_user.id)
 
-    query = await db.execute(query)
-    overdue_loans = query.scalars().all()
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
 
-    return overdue_loans
+    pagination_query = query.offset(skip).limit(limit)
+    result = await db.execute(pagination_query)
+    overdue_loans = result.scalars().all()
+
+    return PaginationResponse(
+        items=overdue_loans,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
 
 
-@router.get("/user/{user_id}", response_model=list[LoanResponse])
-async def get_loans_for_user(user_id: int, db: AsyncSession = Depends(get_db),
+@router.get("/user/{user_id}", response_model=PaginationResponse[LoanResponse])
+async def get_loans_for_user(user_id: int,
+                             skip: int = 0,
+                             limit: int = 20,
+                             db: AsyncSession = Depends(get_db),
                              current_admin: UserModel = Depends(get_current_admin)):
 
     query = select(LoanModel).options(
@@ -63,10 +90,20 @@ async def get_loans_for_user(user_id: int, db: AsyncSession = Depends(get_db),
             LoanModel.user_id == user_id
     )
 
-    query = await db.execute(query)
-    loans = query.scalars().all()
+    count_query = select(func.count()).select_from(query.subquery())
+    result = await db.execute(count_query)
+    total = result.scalar()
 
-    return loans
+    pagination_query = query.offset(skip).limit(limit)
+    result = await db.execute(pagination_query)
+    loans = result.scalars().all()
+
+    return PaginationResponse(
+        items=loans,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
 
 
 @router.get("/{loan_id}", response_model=LoanResponse,)
@@ -89,7 +126,9 @@ async def get_loan(loan_id: int, db: AsyncSession = Depends(get_db),
 @router.post("/{user_id}", response_model=LoanResponse)
 async def create_loan(user_id: int, loan: Loan, db: AsyncSession = Depends(get_db),
                       current_user: UserModel = Depends(get_current_admin)):
-    user_query = await db.execute(select(UserModel).where(UserModel.id == user_id))
+    user_query = await db.execute(
+        select(UserModel)
+        .where(UserModel.id == user_id))
     user = user_query.scalar_one_or_none()
 
     if not user:
@@ -98,7 +137,9 @@ async def create_loan(user_id: int, loan: Loan, db: AsyncSession = Depends(get_d
 
     book_query = await db.execute(
         select(BookModel)
-        .where(BookModel.id == loan.book_id))
+        .where(BookModel.id == loan.book_id)
+        .with_for_update()
+    )
 
     book = book_query.scalar_one_or_none()
 
@@ -131,10 +172,6 @@ async def create_loan(user_id: int, loan: Loan, db: AsyncSession = Depends(get_d
             detail=f"User {user_id} already has active loan for book {loan.book_id}"
         )
 
-    book.quantity -= 1
-
-    duedate = datetime.now(timezone.utc) + timedelta(days=loan.duration)
-
     five_or_more_active_loans_query = await db.execute(
         select(LoanModel)
         .where(LoanModel.user_id == user_id,
@@ -150,6 +187,8 @@ async def create_loan(user_id: int, loan: Loan, db: AsyncSession = Depends(get_d
         raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                             detail=f"User {user_id} already has 5 loans")
 
+    book.quantity -= 1
+    duedate = datetime.now(timezone.utc) + timedelta(days=loan.duration)
     new_loan = LoanModel(
         user_id=user_id,
         book_id=loan.book_id,
