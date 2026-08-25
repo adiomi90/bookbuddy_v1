@@ -1,5 +1,6 @@
 import pytest
 
+
 @pytest.mark.asyncio
 async def test_register_new_user(async_client):
     payload = {
@@ -22,7 +23,6 @@ async def test_register_new_user(async_client):
     assert "password" not in data
     assert "password_hash" not in data
     assert "token" not in data
-
 
 
 @pytest.mark.asyncio
@@ -68,7 +68,6 @@ async def test_unathenticated_access_denied(async_client):
     assert response.status_code == 401
 
 
-
 @pytest.mark.asyncio
 async def test_authenticated_access_allowed(async_client, test_user):
     login_data = {
@@ -77,14 +76,13 @@ async def test_authenticated_access_allowed(async_client, test_user):
     }
 
     login_response = await async_client.post("/auth/login",
-                                            data=login_data)
+                                             data=login_data)
 
     token = login_response.json()["access_token"]
 
     headers = {
         "authorization": f"Bearer {token}"
     }
-
 
     response = await async_client.get("/loans/me", headers=headers)
 

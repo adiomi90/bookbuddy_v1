@@ -10,6 +10,7 @@ from app.database.base import Base
 from app.database.database import get_db
 from app.main import app
 from app.models.user import User
+from app.models.book import Book
 from app.security.security import hash_password
 
 
@@ -88,3 +89,40 @@ async def test_user(init_test_db, test_session_factory):
         await db.refresh(user)
 
         yield user
+
+
+@pytest_asyncio.fixture
+async def test_admin(init_test_db, test_session_factory):
+    async with test_session_factory() as db:
+        admin = User(
+            first_name="Admin",
+            last_name="User",
+            email="admin@test.com",
+            password_hash=hash_password("admin-password"),
+            is_admin=True,
+        )
+
+        db.add(admin)
+
+        await db.commit()
+        await db.refresh(admin)
+
+        yield admin
+
+
+@pytest_asyncio.fixture
+async def sample_book(init_test_db, test_session_factory):
+    async with test_session_factory() as db:
+        book = Book(
+            title="Clean Code",
+            author="Robert C. Martin",
+            isbn="9880132350088",
+            publisher="Prentice Hall",
+            publisher_year=2008,
+            summary="A handbook of agile software craftmanship",
+            quantity=3
+        )
+
+        db.add(book)
+        await db.commit()
+        yield book
