@@ -81,7 +81,7 @@ async def test_authenticated_access_allowed(async_client, test_user):
     token = login_response.json()["access_token"]
 
     headers = {
-        "authorization": f"Bearer {token}"
+        "Authorization": f"Bearer {token}"
     }
 
     response = await async_client.get("/loans/me", headers=headers)

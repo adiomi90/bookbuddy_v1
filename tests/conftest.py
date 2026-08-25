@@ -125,4 +125,24 @@ async def sample_book(init_test_db, test_session_factory):
 
         db.add(book)
         await db.commit()
+        await db.refresh(book)
+        yield book
+
+
+@pytest_asyncio.fixture
+async def out_of_stock_book(init_test_db, test_session_factory):
+    async with test_session_factory() as db:
+        book = Book(
+            title="Rare Book",
+            author="Empty",
+            isbn="0000000000",
+            publisher="None",
+            publisher_year=2020,
+            summary="This book has no copies avaible",
+            quantity=0
+        )
+
+        db.add(book)
+        await db.commit()
+        await db.refresh(book)
         yield book
