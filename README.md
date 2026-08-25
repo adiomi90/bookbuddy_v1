@@ -10,7 +10,7 @@ The project focuses on clean API design, asynchronous database access, JWT authe
 
 ## Features
 
-### Authenticationf
+### Authentication
 
 * User registration
 * User login with OAuth2 password flow
