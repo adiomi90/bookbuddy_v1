@@ -15,8 +15,7 @@ async def test_admin_can_create_loan(
         "password": "admin-password"
     }
 
-    login_response = await async_client.post("/auth/login",
-                                             data=login_data)
+    login_response = await async_client.post("/auth/login", data=login_data)
     token = login_response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -101,7 +100,6 @@ async def test_reject_duplicate_active_loan(
         "duration": 7
     }
 
-
     response = await async_client.post(
         f"/loans/{test_user.id}",
         json=loan_data,
@@ -124,19 +122,62 @@ async def test_reject_duplicate_active_loan(
 
         assert updated_book.quantity == 2
 
-
     loan_data = {
-            "book_id": sample_book.id,
-            "duration": 15
-        }
+        "book_id": sample_book.id,
+        "duration": 15
+    }
 
     response = await async_client.post(
+        f"/loans/{test_user.id}",
+        json=loan_data,
+        headers=headers
+    )
+
+    assert response.status_code == 409
+    error_data = response.json()
+    assert "already has active loan" in error_data["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_reject_sixth_loan(
+    async_client,
+    test_user,
+    test_admin,
+    five_books,
+    sample_book,
+    test_session_factory
+):
+    login_data = {
+        "username": test_admin.email,
+        "password": "admin-password"
+    }
+
+    login_response = await async_client.post("/auth/login", data=login_data)
+    token = login_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    for book in five_books:
+        loan_data = {
+            "book_id": book.id,
+            "duration": 7
+        }
+
+        response = await async_client.post(
             f"/loans/{test_user.id}",
             json=loan_data,
             headers=headers
         )
-    
+
+        assert response.status_code == 200
+
+    sixth_book = {
+        "book_id": sample_book.id,
+        "duration": 15
+    }
+    response = await async_client.post(
+        f"/loans/{test_user.id}",
+        json=sixth_book,
+        headers=headers
+    )
+
     assert response.status_code == 409
-    error_data = response.json()
-    assert "already has active loan" in error_data["detail"].lower()
-    

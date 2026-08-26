@@ -146,3 +146,28 @@ async def out_of_stock_book(init_test_db, test_session_factory):
         await db.commit()
         await db.refresh(book)
         yield book
+
+
+@pytest_asyncio.fixture
+async def five_books(init_test_db, test_session_factory):
+    async with test_session_factory() as db:
+        books = []
+        for i in range(5):
+            book = Book(
+                title=f"Book {i+1}",
+                author=f"Author {i+1}",
+                isbn=f"isbn-{i+1:04d}",
+                publisher="Test Publisher",
+                publisher_year=2020,
+                summary=f"Summary for book {i+1}",
+                quantity=10
+            )
+
+            db.add(book)
+            books.append(book)
+
+        await db.commit()
+        for book in books:
+            await db.refresh(book)
+
+        yield books

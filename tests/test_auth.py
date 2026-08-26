@@ -79,12 +79,8 @@ async def test_authenticated_access_allowed(async_client, test_user):
                                              data=login_data)
 
     token = login_response.json()["access_token"]
-
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
+    headers = {"Authorization": f"Bearer {token}"}
 
     response = await async_client.get("/loans/me", headers=headers)
 
     assert response.status_code == 200
-
