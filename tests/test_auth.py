@@ -87,3 +87,4 @@ async def test_authenticated_access_allowed(async_client, test_user):
     response = await async_client.get("/loans/me", headers=headers)
 
     assert response.status_code == 200
+
