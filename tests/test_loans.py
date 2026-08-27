@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import select
 from app.models.book import Book as BookModel
-
+import asyncio
 
 @pytest.mark.asyncio
 async def test_admin_can_create_loan(
@@ -315,3 +315,58 @@ async def test_reject_double_return(
     error_data = second_return_response.json()
     assert f"loan id {loan_id} already returned" in error_data["detail"].lower(
     )
+
+
+@pytest.mark.asyncio
+async def test_concurrent_loan_creation(
+    async_client,
+    test_user,
+    test_admin,
+    test_session_factory
+):
+    async with test_session_factory() as db:
+        from app.models.book import Book
+        book = Book(
+            title="Last Copy",
+            author="Author",
+            isbn="isbn-copy",
+            publisher="Publisher",
+            publisher_year=2020,
+            summary="Only one copy available",
+            quantity=1
+        )
+        db.add(book)
+        await db.commit()
+        await db.refresh(book)
+        book_id = book.id
+    
+    login_data = {
+        "username": test_admin.email,
+        "password": "admin-password"
+    }
+
+    login_response = await async_client.post("/auth/login", data=login_data)
+    token = login_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    loan_data = {
+        "book_id": book_id,
+        "duration": 7
+    }
+    
+    response1, response2 = await asyncio.gather(
+        async_client.post(f"/loans/{test_user.id}", json=loan_data, headers=headers),
+        async_client.post(f"/loans/{test_user.id}", json=loan_data, headers=headers)
+    )
+    
+    status_codes = sorted([response1.status_code, response2.status_code])
+    assert status_codes == [200, 409]
+    
+    async with test_session_factory() as db:
+        from sqlalchemy import select
+        from app.models.book import Book as BookModel
+        result = await db.execute(
+            select(BookModel).where(BookModel.id == book_id)
+        )
+        final_book = result.scalar_one()
+        assert final_book.quantity == 0
