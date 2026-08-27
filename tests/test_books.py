@@ -5,9 +5,7 @@ from app.models.book import Book
 @pytest.mark.asyncio
 async def test_admin_can_create_book(
         async_client,
-        test_user,
         test_admin,
-        sample_book,
         test_session_factory):
     login_data = {
         "username": test_admin.email,
@@ -43,3 +41,35 @@ async def test_admin_can_create_book(
     assert data["publisher_year"] == 2020
     assert data["summary"] == "Test Another book"
     assert data["quantity"] == 0
+
+
+@pytest.mark.asyncio
+async def test_user_create_book_rejected(
+        async_client,
+        test_user,
+        test_session_factory):
+    login_data = {
+        "username": test_user.email,
+        "password": "test-password"
+    }
+
+    login_response = await async_client.post("/auth/login", data=login_data)
+    token = login_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    book = {
+        "title": "Test Book",
+        "author": "Author",
+        "isbn": "isbn-copy",
+        "publisher": "Publisher",
+        "publisher_year": 2020,
+        "summary": "Test Another book"
+    }
+
+    response = await async_client.post(
+        "/books/",
+        json=book,
+        headers=headers
+    )
+
+    assert response.status_code == 403
