@@ -1,5 +1,7 @@
 # BookBuddy - Library Management API
 
+[![BookBuddy CI](https://github.com/adiomi90/bookbuddy_v1/actions/workflows/ci.yml/badge.svg)](https://github.com/adiomi90/bookbuddy_v1/actions)
+
 A production-ready REST API for managing users, books, and library loans, built with **FastAPI**, **SQLAlchemy**, and **PostgreSQL**.
 
 ![Python](https://img.shields.io/badge/Python-3.13-blue)
