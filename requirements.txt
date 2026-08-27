@@ -50,3 +50,4 @@ typing-inspection==0.4.3
 typing_extensions==4.16.0
 tzlocal==5.4.4
 uvicorn==0.52.1
+psycopg2-binary
