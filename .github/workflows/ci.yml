@@ -1,0 +1,43 @@
+name: BookBuddy CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Create .env-docker file for CI
+      run: |
+        echo "POSTGRES_USER=ci_user" > .env-docker
+        echo "POSTGRES_PASSWORD=ci_password" >> .env-docker
+        echo "POSTGRES_DB=ci_db" >> .env-docker
+        echo "DATABASE_URL=postgresql+asyncpg://ci_user:ci_password@db:5432/ci_db" >> .env-docker
+        echo "TEST_DATABASE_URL=postgresql+asyncpg://ci_user:ci_password@db:5432/ci_db" >> .env-docker
+        echo "SECRET_KEY=super-secret-ci-key-not-for-prod" >> .env-docker
+        echo "ALGORITHM=HS256" >> .env-docker
+        echo "ACCESS_TOKEN_EXPIRE_MINUTES=30" >> .env-docker
+
+    - name: Build and start Docker containers
+      run: docker compose up -d --build
+
+    - name: Wait for services to be healthy
+      run: |
+        # Give the containers a moment to initialize
+        sleep 15
+        docker compose ps
+
+    - name: Run tests inside the container
+      # The -T flag is crucial! It disables the pseudo-TTY which isn't available in CI
+      run: docker compose exec -T app pytest -v
+
+    - name: Tear down containers
+      if: always()
+      run: docker compose down -v
