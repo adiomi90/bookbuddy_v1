@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 from fastapi import Depends
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_db
 from app.schemas.user import UserRegistration, UserResponse
@@ -22,12 +22,20 @@ async def registration(new_user: UserRegistration, db: AsyncSession = Depends(ge
         raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                             detail=f"User with email '{new_user.email}' already exists")
 
+    query = await db.execute(select(func.count(UserModel.id)))
+    user_count = query.scalar_one_or_none()
+
+    is_admin = True if user_count == 0 else False
+    #is_admin = (user_count == 0) shorter form
+
     register_user = UserModel(
         first_name=new_user.first_name,
         last_name=new_user.last_name,
         email=new_user.email,
-        password_hash=hash_password(new_user.password))
-
+        password_hash=hash_password(new_user.password),
+        is_admin=is_admin
+)
+    
     db.add(register_user)
     await db.commit()
 

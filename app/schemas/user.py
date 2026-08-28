@@ -30,6 +30,7 @@ class UserResponse(BaseModel):
     first_name: str
     last_name: str
     email: EmailStr
+    is_admin: bool
     created_at: datetime
     updated_at: datetime
 

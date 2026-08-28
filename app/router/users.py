@@ -49,16 +49,52 @@ async def get_all_users(db: AsyncSession = Depends(get_db),
     return results
 
 
-@router.get("/{user_id}", response_model=UserResponse)
-async def get_user_by_id(user_id: int, db: AsyncSession = Depends(get_db),
+@router.patch("/{user_id}/promote", response_model=UserResponse)
+async def promote_user_to_admin(user_id: int, db: AsyncSession = Depends(get_db),
                          current_admin: UserModel = Depends(get_current_admin)):
     db_user = await db.execute(select(UserModel).where(UserModel.id == user_id))
-    result = db_user.scalar_one_or_none()
+    user = db_user.scalar_one_or_none()
 
-    if not result:
+    if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"User with id {user_id} not found")
-    return result
+
+    if user.is_admin:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=f"user with id {user_id} is already an admin")
+   
+    user.is_admin = True
+
+    await db.commit()
+    await db.refresh(user)
+
+    return user
+
+
+@router.patch("/{user_id}/demote", response_model=UserResponse)
+async def demote_admin_to_user(user_id: int, db: AsyncSession = Depends(get_db),
+                         current_admin: UserModel = Depends(get_current_admin)):
+    db_user = await db.execute(select(UserModel).where(UserModel.id == user_id))
+    user = db_user.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"User with id {user_id} not found")
+
+    if current_admin.id == user_id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=f"admin can't demote themselves")
+
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=f"User with id {user_id} is not an admin")
+    
+    user.is_admin = False
+
+    await db.commit()
+    await db.refresh(user)
+
+    return user
 
 
 @router.patch("/me", response_model=UserResponse)
@@ -86,6 +122,17 @@ async def update_my_profile(user_update: UserUpdate, db: AsyncSession = Depends(
     await db.refresh(current_user)
 
     return current_user
+
+@router.get("/{user_id}", response_model=UserResponse)
+async def get_user_by_id(user_id: int, db: AsyncSession = Depends(get_db),
+                         current_admin: UserModel = Depends(get_current_admin)):
+    db_user = await db.execute(select(UserModel).where(UserModel.id == user_id))
+    result = db_user.scalar_one_or_none()
+
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"User with id {user_id} not found")
+    return result
 
 
 @router.patch("/{user_id}", response_model=UserResponse)
