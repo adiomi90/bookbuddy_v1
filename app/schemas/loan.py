@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from app.schemas.book import BookResponse
 from app.schemas.user import UserResponse
-from enum import Enum
+from enum import IntEnum, StrEnum
 from typing import Generic, TypeVar, List
 
 T = TypeVar("T")
@@ -15,10 +15,14 @@ class PaginationResponse(BaseModel, Generic[T]):
     limit: int
 
 
-class LoanDuration(int, Enum):
+class LoanDuration(IntEnum):
     SEVEN_DAYS = 7
     FIFTEEN_DAYS = 15
     THIRTY_DAYS = 30
+
+
+class RenewalDuration(BaseModel):
+    renewal_duration: LoanDuration
 
 
 class Loan(BaseModel):
@@ -26,7 +30,7 @@ class Loan(BaseModel):
     duration: LoanDuration
 
 
-class LoanStatus(str, Enum):
+class LoanStatus(StrEnum):
     BORROWED = "borrowed"
     RETURNED = "returned"
     OVERDUE = "overdue"

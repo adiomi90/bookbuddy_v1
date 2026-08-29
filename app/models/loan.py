@@ -1,4 +1,4 @@
-from sqlalchemy import String, DateTime, func, ForeignKey, CheckConstraint
+from sqlalchemy import String, DateTime, func, ForeignKey, CheckConstraint, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from app.database.base import Base
@@ -17,6 +17,8 @@ class Loan(Base):
         String(20), nullable=False, default="borrowed")
     due_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False)
+    renewal_count: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False)
     returned_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True)
     borrowed_date: Mapped[datetime] = mapped_column(DateTime(timezone=True),

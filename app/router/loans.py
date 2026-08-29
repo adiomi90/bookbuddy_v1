@@ -4,7 +4,7 @@ from sqlalchemy import select, or_, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_db
-from app.schemas.loan import Loan, LoanResponse, LoanUpdate, LoanDuration, PaginationResponse
+from app.schemas.loan import Loan, LoanResponse, LoanUpdate, RenewalDuration, PaginationResponse
 from app.models.loan import Loan as LoanModel
 from app.models.book import Book as BookModel
 from app.models.user import User as UserModel
@@ -208,6 +208,57 @@ async def create_loan(user_id: int, loan: Loan, db: AsyncSession = Depends(get_d
     )
     new_loan = loan_query.scalar_one()
     return new_loan
+
+
+@router.patch("/renew", response_model=LoanResponse)
+async def renew_loan(title: str,
+                     duration: RenewalDuration,
+                     db: AsyncSession = Depends(get_db),
+                     current_user: UserModel = Depends(get_current_user)):
+
+    query = select(LoanModel).join(BookModel).where(
+        BookModel.title.ilike(f"%{title}%"),
+        LoanModel.user_id == current_user.id,
+        LoanModel.status == "borrowed"
+    )
+
+    query = await db.execute(query)
+    loan_query = query.scalars().all()
+
+    if not loan_query:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="No active loan found for the match")
+
+    if len(loan_query) > 1:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="multiple book match please be specific")
+
+    loan = loan_query[0]
+
+    if loan.due_date < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="book already overdue, can't be renewed")
+
+    if loan.renewal_count >= 2:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="Maximum renewals reached")
+
+    loan.due_date = loan.due_date + timedelta(days=duration.renewal_duration)
+
+    loan.renewal_count += 1
+
+    await db.commit()
+    await db.refresh(loan)
+
+    loan_query = await db.execute(
+        select(LoanModel).options(
+            selectinload(LoanModel.user),
+            selectinload(LoanModel.book)
+        ).where(LoanModel.id == loan.id))
+
+    loan = loan_query.scalar_one()
+
+    return loan
 
 
 @router.patch("/{loan_id}/return", response_model=LoanResponse)
