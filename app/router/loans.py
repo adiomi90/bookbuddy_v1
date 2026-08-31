@@ -11,7 +11,7 @@ from app.models.loan import Loan as LoanModel
 from app.models.book import Book as BookModel
 from app.models.user import User as UserModel
 from app.security.security import get_current_user, get_current_admin
-from app.utils.loan_helper import loan_with_fine
+from app.utils.loan_helper import loan_with_fine, calculate_loan_fine
 
 from datetime import datetime, timezone, timedelta
 
@@ -317,6 +317,9 @@ async def return_loan(loan_id: int, db: AsyncSession = Depends(get_db),
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Book id {loan.book_id} can't be returned")
 
+    _, final_fine = calculate_loan_fine(loan)
+    loan.fine_amount = final_fine
+
     loan.status = "returned"
     loan.returned_date = datetime.now(timezone.utc)
     book.quantity += 1
@@ -325,7 +328,7 @@ async def return_loan(loan_id: int, db: AsyncSession = Depends(get_db),
 
     await db.refresh(loan)
     await db.refresh(book)
-    return loan
+    return loan_with_fine(loan)
 
 
 @router.patch("/{loan_id}", response_model=LoanResponse)
