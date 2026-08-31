@@ -54,3 +54,8 @@ class LoanResponse(BaseModel):
     fine_amount: float = 0.0
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserFineResponse(BaseModel):
+    total_fines: float
+    overdue_loans: list[LoanResponse]

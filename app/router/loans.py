@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.database import get_db
-from app.schemas.loan import Loan, LoanResponse, LoanUpdate, RenewalDuration, PaginationResponse
+from app.schemas.loan import Loan, LoanResponse, LoanUpdate, RenewalDuration, PaginationResponse, UserFineResponse
 from app.models.loan import Loan as LoanModel
 from app.models.book import Book as BookModel
 from app.models.user import User as UserModel
@@ -49,6 +49,30 @@ async def get_loans(skip: int = 0,
         total=total,
         skip=skip,
         limit=limit
+    )
+
+
+@router.get("/me/fines", response_model=UserFineResponse)
+async def get_user_fines(db: AsyncSession = Depends(get_db),
+                         current_user: UserModel = Depends(get_current_user)):
+    query = select(LoanModel).options(
+        selectinload(LoanModel.book),
+        selectinload(LoanModel.user)
+    ).where(
+        LoanModel.user_id == current_user.id,
+        LoanModel.status == "overdue"
+    )
+
+    loans_query = await db.execute(query)
+    overdue_loans = loans_query.scalars().all()
+
+    loan_with_fines = [loan_with_fine(loan) for loan in overdue_loans]
+
+    total_fines = sum(loan["fine_amount"] for loan in loan_with_fines)
+
+    return UserFineResponse(
+        total_fines=total_fines,
+        overdue_loans=loan_with_fines
     )
 
 
