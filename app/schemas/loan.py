@@ -50,5 +50,7 @@ class LoanResponse(BaseModel):
     borrowed_date: datetime
     created_at: datetime
     updated_at: datetime
+    days_overdue: int = 0
+    fine_amount: float = 0.0
 
     model_config = ConfigDict(from_attributes=True)

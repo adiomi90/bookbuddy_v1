@@ -1,14 +1,18 @@
 from fastapi import APIRouter, HTTPException, status
 from fastapi import Depends
+
 from sqlalchemy import select, or_, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.database.database import get_db
 from app.schemas.loan import Loan, LoanResponse, LoanUpdate, RenewalDuration, PaginationResponse
 from app.models.loan import Loan as LoanModel
 from app.models.book import Book as BookModel
 from app.models.user import User as UserModel
 from app.security.security import get_current_user, get_current_admin
+from app.utils.loan_helper import loan_with_fine
+
 from datetime import datetime, timezone, timedelta
 
 router = APIRouter(prefix="/loans", tags=["loans"])
@@ -69,8 +73,9 @@ async def get_overdue_loans(skip: int = 0,
     result = await db.execute(pagination_query)
     overdue_loans = result.scalars().all()
 
+    loans_with_fine = [loan_with_fine(loan) for loan in overdue_loans]
     return PaginationResponse(
-        items=overdue_loans,
+        items=loans_with_fine,
         total=total,
         skip=skip,
         limit=limit
