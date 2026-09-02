@@ -67,8 +67,10 @@ class PaymentStatus(StrEnum):
     PENDING = "pending"
     REJECTED = "rejected"
 
+
 class FinePaymentStatus(BaseModel):
     status: PaymentStatus
+
 
 class VerifyPayment(BaseModel):
     action: Literal["approve", "reject"]

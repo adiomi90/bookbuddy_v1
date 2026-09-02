@@ -6,6 +6,7 @@ from app.router.books import router as book_router
 from app.router.loans import router as loan_router
 from app.scheduled_task.scheduler import scheduler
 from app.router.auth import router as auth_router
+from app.router.analytics import router as analytics_router
 
 
 @asynccontextmanager
@@ -22,3 +23,4 @@ app.include_router(user_router)
 app.include_router(book_router)
 app.include_router(loan_router)
 app.include_router(auth_router)
+app.include_router(analytics_router)
