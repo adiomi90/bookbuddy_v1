@@ -21,6 +21,11 @@ class Loan(Base):
         Integer, default=0, nullable=False)
     fine_amount: Mapped[float] = mapped_column(
         Float, default=0.0, nullable=False)
+    payment_status: Mapped[str | None] = mapped_column(
+        String(20), nullable=True, default=None)
+    payment_submitted_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True)
+
     returned_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True)
     borrowed_date: Mapped[datetime] = mapped_column(DateTime(timezone=True),

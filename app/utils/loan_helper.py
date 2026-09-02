@@ -27,6 +27,7 @@ def loan_with_fine(loan: LoanModel):
         "due_date": loan.due_date,
         "returned_date": loan.returned_date,
         "borrowed_date": loan.borrowed_date,
+        "payment_status": loan.payment_status,
         "renewal_count": loan.renewal_count,
         "days_overdue": days_overdue,
         "fine_amount": fine_amount,

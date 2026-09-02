@@ -6,12 +6,13 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.database import get_db
-from app.schemas.loan import Loan, LoanResponse, LoanUpdate, RenewalDuration, PaginationResponse, UserFineResponse
+from app.schemas.loan import Loan, LoanResponse, LoanUpdate, RenewalDuration, PaginationResponse, UserFineResponse, FinePaymentStatus
 from app.models.loan import Loan as LoanModel
 from app.models.book import Book as BookModel
 from app.models.user import User as UserModel
 from app.security.security import get_current_user, get_current_admin
 from app.utils.loan_helper import loan_with_fine, calculate_loan_fine
+
 
 from datetime import datetime, timezone, timedelta
 
@@ -150,6 +151,41 @@ async def get_loan(loan_id: int, db: AsyncSession = Depends(get_db),
                             detail=f"loan id {loan_id} does not exist")
 
     return loan
+
+
+@router.post("/pay-all-fine", response_model=dict)
+async def pay_all_fine(db: AsyncSession = Depends(get_db),
+                       current_user: UserModel = Depends(get_current_user)
+                       ):
+    unpaid_loans_query = await db.execute(
+        select(LoanModel)
+        .options(selectinload(LoanModel.book))
+        .where(
+            LoanModel.user_id == current_user.id,
+            LoanModel.payment_status == "unpaid"
+        )
+    )
+
+    unpaid_loans = unpaid_loans_query.scalars().all()
+
+    if not unpaid_loans:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="No unpaid fines found")
+
+    total_amount = sum(loan.fine_amount for loan in unpaid_loans)
+
+    now = datetime.now(timezone.utc)
+    for loan in unpaid_loans:
+        loan.payment_status = "pending"
+        loan.payment_submitted_date = now
+
+    await db.commit()
+
+    return {
+        "message": f"Successfully submitted payment for {len(unpaid_loans)} loan(s)",
+        "total_amount": total_amount,
+        "loans_updated": [loan.book.title for loan in unpaid_loans]
+    }
 
 
 @router.post("/{user_id}", response_model=LoanResponse)
@@ -319,6 +355,9 @@ async def return_loan(loan_id: int, db: AsyncSession = Depends(get_db),
 
     _, final_fine = calculate_loan_fine(loan)
     loan.fine_amount = final_fine
+
+    if loan.fine_amount > 0:
+        loan.payment_status = "unpaid"
 
     loan.status = "returned"
     loan.returned_date = datetime.now(timezone.utc)

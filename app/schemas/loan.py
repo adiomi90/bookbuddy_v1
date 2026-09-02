@@ -59,3 +59,13 @@ class LoanResponse(BaseModel):
 class UserFineResponse(BaseModel):
     total_fines: float
     overdue_loans: list[LoanResponse]
+
+
+class PaymentStatus(StrEnum):
+    PAID = "paid"
+    UNPAID = "unpaid"
+    PENDING = "pending"
+    REJECTED = "rejected"
+
+class FinePaymentStatus(BaseModel):
+    status: PaymentStatus
