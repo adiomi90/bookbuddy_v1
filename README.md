@@ -49,6 +49,12 @@ BookBuddy demonstrates enterprise-level backend development practices including:
 - Automatic overdue detection via APScheduler
 - Admin-only loan returns and due date updates
 
+### Fine & Payment Management
+- **Automated Fine Calculation**: Calculates fines automatically upon book return based on overdue days.
+- **State Machine Workflow**: Tracks payment status securely (`unpaid` → `pending` → `paid` or `rejected`).
+- **Bulk Payment Submission**: Users can submit payment for all their unpaid fines at once.
+- **Admin Verification**: Secure admin-only endpoint to approve or reject pending payments.
+
 ### Background Jobs
 - Daily overdue loan detection
 - Automatic status updates for expired loans
@@ -190,7 +196,8 @@ The `test_concurrent_loan_creation` test simulates 10 simultaneous requests to b
 - `GET /loans/overdue` - Get overdue loans (admin only)
 - `PATCH /loans/{id}/return` - Return a book (admin only)
 - `PATCH /loans/{id}` - Update due date (admin only)
-
+- `POST /loans/pay-all-fine` - Submit payment for all unpaid fines (user)
+- `PATCH /loans/{id}/verify-payment` - Approve or reject a pending payment (admin only)
 ---
 
 ## 🔐 Security Features
@@ -274,6 +281,7 @@ ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
+---
 
 ```.env-docker
 POSTGRES_USER=your_user
@@ -288,7 +296,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 ---
 
 ## 🚧 Roadmap
-
 ### Completed ✅
 - [x] User authentication & authorization
 - [x] JWT token management
@@ -300,17 +307,18 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 - [x] Comprehensive test suite (14+ tests)
 - [x] Docker containerization
 - [x] Database migrations with Alembic
+- [x] **Automated fine calculation and payment verification workflow**
 
 ### Future Enhancements 🚀
+- [ ] **Admin Analytics Dashboard** (metrics, charts, and reporting)
 - [ ] Rate limiting
 - [ ] API versioning
-- [ ] Email notifications for overdue books
+- [ ] Email notifications for overdue books and payment receipts
 - [ ] Advanced search with full-text search
 - [ ] Redis caching layer
 - [ ] CI/CD pipeline with GitHub Actions
 - [ ] Cloud deployment (AWS/GCP)
 - [ ] Monitoring & logging (Prometheus/Grafana)
-
 ---
 
 ## 📚 Learning Resources
@@ -350,4 +358,4 @@ Built with ❤️ as a comprehensive demonstration of modern backend development
 
 **Status:** ✅ Production-ready with comprehensive testing and Docker support
 
-**Last Updated:** August 2026
+**Last Updated:** September 2026
