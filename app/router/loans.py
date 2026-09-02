@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.database import get_db
-from app.schemas.loan import Loan, LoanResponse, LoanUpdate, RenewalDuration, PaginationResponse, UserFineResponse, FinePaymentStatus
+from app.schemas.loan import Loan, LoanResponse, LoanUpdate, RenewalDuration, PaginationResponse, UserFineResponse, VerifyPayment
 from app.models.loan import Loan as LoanModel
 from app.models.book import Book as BookModel
 from app.models.user import User as UserModel
@@ -369,7 +369,46 @@ async def return_loan(loan_id: int, db: AsyncSession = Depends(get_db),
     await db.refresh(book)
     return loan_with_fine(loan)
 
+@router.patch("/{loan_id}/verify-payment", response_model=LoanResponse)
+async def verify_payment(loan_id: int,
+                          request: VerifyPayment,
+                            db: AsyncSession = Depends(get_db),
+                            admin: UserModel = Depends(get_current_admin)
+                            ):
+    loan_query = await db.execute(select(LoanModel)
+                                  .options(selectinload(LoanModel.book),
+                                           selectinload(LoanModel.user))
+                                  .where(LoanModel.id == loan_id))
 
+
+    loan = loan_query.scalar_one_or_none()
+
+    if not loan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Loan doesn't exist")
+
+    if loan.payment_status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Payment is not pending verification"
+        ) 
+
+    if request.action == "approve":
+        loan.payment_status = "paid"
+    else:
+        loan.payment_status = "rejected"
+
+    await db.commit()
+    await db.refresh(loan)
+
+    return loan_with_fine(loan)
+
+
+
+
+
+
+    
 @router.patch("/{loan_id}", response_model=LoanResponse)
 async def update_duedate(loan_id: int, loan_update: LoanUpdate, db: AsyncSession = Depends(get_db),
                          current_admin: UserModel = Depends(get_current_admin)):

@@ -3,7 +3,7 @@ from datetime import datetime
 from app.schemas.book import BookResponse
 from app.schemas.user import UserResponse
 from enum import IntEnum, StrEnum
-from typing import Generic, TypeVar, List
+from typing import Generic, TypeVar, List, Literal
 
 T = TypeVar("T")
 
@@ -69,3 +69,6 @@ class PaymentStatus(StrEnum):
 
 class FinePaymentStatus(BaseModel):
     status: PaymentStatus
+
+class VerifyPayment(BaseModel):
+    action: Literal["approve", "reject"]
