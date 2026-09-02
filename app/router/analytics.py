@@ -6,7 +6,7 @@ from app.database.database import get_db
 from app.models.book import Book as BookModel
 from app.models.user import User as UserModel
 from app.models.loan import Loan as LoanModel
-from app.schemas.analytics import TopBorrowedBookResponse, TopBorrowedBook
+from app.schemas.analytics import TopBorrowedBookResponse, TopBorrowedBook, PendingFinesResponse
 from app.security.security import get_current_admin
 
 
@@ -39,3 +39,20 @@ async def get_top_borrowed_books(
     ]
 
     return TopBorrowedBookResponse(books=top_books)
+
+
+@router.get("/pending-fines-total", response_model=PendingFinesResponse)
+async def get_peding_fines_total(
+    db: AsyncSession = Depends(get_db),
+    current_admin: UserModel = Depends(get_current_admin)
+):
+    query = select(
+        func.sum(LoanModel.fine_amount)
+    ).where(LoanModel.payment_status == "pending")
+
+    result = await db.execute(query)
+    total = result.scalar_one_or_none()
+
+    final_total = total if total else 0.0
+
+    return PendingFinesResponse(total_pending_amount=final_total)

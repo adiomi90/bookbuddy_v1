@@ -6,5 +6,10 @@ class TopBorrowedBook(BaseModel):
     book_title: str
     borrow_count: int
 
+
 class TopBorrowedBookResponse(BaseModel):
     books: List[TopBorrowedBook]
+
+
+class PendingFinesResponse(BaseModel):
+    total_pending_amount: float
