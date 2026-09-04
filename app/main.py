@@ -17,7 +17,21 @@ async def lifespan(app: FastAPI):
     yield
     scheduler.shutdown()
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="BookBuddy Library Management System",
+    description="A production-ready REST API for managing users, books, and library loans.",
+    lifespan=lifespan
+)
+
+
+@app.get("/")
+def welcome():
+    return {
+        "message": "Welcome to the BookBuddy Libarary Management System",
+        "docs": "/docs",
+        "status": "healthy"
+    }
+
 
 app.include_router(user_router)
 app.include_router(book_router)

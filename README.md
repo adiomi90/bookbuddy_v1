@@ -1,5 +1,7 @@
 # BookBuddy - Library Management API
 
+**Interactive API Documentation:** https://bookbuddy-v1.onrender.com/docs
+
 [![BookBuddy CI](https://github.com/adiomi90/bookbuddy_v1/actions/workflows/ci.yml/badge.svg)](https://github.com/adiomi90/bookbuddy_v1/actions)
 
 A production-ready REST API for managing users, books, and library loans, built with **FastAPI**, **SQLAlchemy**, and **PostgreSQL**.
@@ -93,13 +95,15 @@ app/
 │   └── loan.py           # Loan model with relationships
 ├── schemas/
 │   ├── user.py           # Pydantic schemas for validation
-│   ├── book.py
-│   └── loan.py
+│   ├── book.py           # Book schemas
+│   ├── loan.py           # Loan schemas
+│   └── analytics.py      # Analytics response schemas
 ├── routers/
 │   ├── auth.py           # Authentication endpoints
 │   ├── users.py          # User management
 │   ├── books.py          # Book CRUD
-│   └── loans.py          # Loan operations
+│   ├── loans.py          # Loan operations
+│   └── analytics.py      # Admin analytics endpoints
 ├── security/
 │   └── security.py       # JWT & password hashing
 ├── scheduled_task/
@@ -307,7 +311,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 - [x] Comprehensive test suite (14+ tests)
 - [x] Docker containerization
 - [x] Database migrations with Alembic
-- [x] **Automated fine calculation and payment verification workflow**
+- [x] **Automated fine calculation and payment verification** 
+- [x] **Cloud deployment on Render**
 
 ### Future Enhancements 🚀
 - [ ] **Admin Analytics Dashboard** (metrics, charts, and reporting)
@@ -317,7 +322,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 - [ ] Advanced search with full-text search
 - [ ] Redis caching layer
 - [ ] CI/CD pipeline with GitHub Actions
-- [ ] Cloud deployment (AWS/GCP)
 - [ ] Monitoring & logging (Prometheus/Grafana)
 ---
 
