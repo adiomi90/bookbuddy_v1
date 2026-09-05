@@ -74,3 +74,7 @@ class FinePaymentStatus(BaseModel):
 
 class VerifyPayment(BaseModel):
     action: Literal["approve", "reject"]
+
+
+class TopUnpaidUsersResponse[BaseModel]:
+    amount: float
