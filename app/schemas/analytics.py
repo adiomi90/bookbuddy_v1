@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 from app.models.user import User
+from datetime import date
 
 
 class TopBorrowedBook(BaseModel):
@@ -17,9 +18,18 @@ class PendingFinesResponse(BaseModel):
 
 
 class TopUnpaidUser(BaseModel):
-    user_email: EmailStr
-    total_unpaid: float
+    user: EmailStr
+    fine_total: float
 
 
 class TopUnpaidUserResponse(BaseModel):
     users: List[TopUnpaidUser]
+
+
+class MonthlyRevenueTrends(BaseModel):
+    month: str
+    total_revenue: float
+
+
+class MonthlyRevenueTrendsResponse(BaseModel):
+    trends: List[MonthlyRevenueTrends]
