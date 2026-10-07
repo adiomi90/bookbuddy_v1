@@ -46,4 +46,5 @@ class Loan(Base):
             "status IN ('borrowed', 'returned', 'overdue')",
             name="check_loan_status_valid"
         ),
+
     )

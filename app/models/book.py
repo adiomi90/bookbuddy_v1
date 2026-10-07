@@ -23,3 +23,6 @@ class Book(Base):
                                                  onupdate=func.now())
 
     loans: Mapped[list["Loan"]] = relationship(back_populates="book")
+    reservations: Mapped[list["Reservation"]] = relationship(
+        back_populates="book", cascade="all, delete-orphan")
+  

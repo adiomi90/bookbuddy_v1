@@ -21,3 +21,5 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False)
     loans: Mapped[list["Loan"]] = relationship(back_populates="user")
+    reservations: Mapped[list["Reservation"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan")
