@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict, model_validator
 from typing import Optional, List
 from datetime import datetime
+from app.schemas.loan import LoanDuration
 
 
 class ReservationCreate(BaseModel):
@@ -54,3 +55,18 @@ class ReservationApproveResponse(BaseModel):
     message: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ReservationPickup(BaseModel):
+    duration: LoanDuration
+
+
+class ReservationPickupResponse(BaseModel):
+    message: str
+    reservation_id: int
+    user_email: str
+    book_title: str
+    loan_id: int
+    loan_date: datetime
+    due_date: datetime
+    duration_days: int

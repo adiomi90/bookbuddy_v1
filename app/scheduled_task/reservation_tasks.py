@@ -22,6 +22,7 @@ async def expire_old_reservations():
 
         if expired_reservations:
             await db.commit()
-            print(f"Background Task: Expired {len(expired_reservations)} reservations.")
+            print(
+                f"Background Task: Expired {len(expired_reservations)} reservations.")
         else:
             print("Background Task: No reservation to expire")

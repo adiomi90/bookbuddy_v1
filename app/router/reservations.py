@@ -5,10 +5,13 @@ from sqlalchemy.orm import selectinload
 from app.database.database import get_db
 from app.models.user import User as UserModel
 from app.models.book import Book as BookModel
+from app.models.loan import Loan as LoanModel
 from app.models.reservation import Reservation as ReservationModel
-from app.schemas.reservation import ReservationCreate, ReservationResponse, ReservationListResponse, ReservationCancelResponse, ReservationCancelRequest, ReservationApproveResponse
+from app.schemas.reservation import ReservationCreate, ReservationResponse, ReservationListResponse, ReservationCancelResponse, ReservationCancelRequest, ReservationApproveResponse, ReservationPickup, ReservationPickupResponse
 from app.security.security import get_current_user, get_current_admin
 from datetime import datetime, timedelta, timezone
+
+
 router = APIRouter(prefix="/reservations", tags=["reservations"])
 
 
@@ -258,5 +261,122 @@ async def admin_approve_reservation(
         user_email=reservation.user.email,
         status=reservation.status,
         expires_at=reservation.expires_at,
-        message="Reservatioin approved. User has 3 days to pick up the book"
+        message="Reservation approved. User has 3 days to pick up the book"
+    )
+
+
+@router.post("/{reservation_id}/pickup", response_model=ReservationPickupResponse)
+async def pickup_reservation(
+    reservation_id: int,
+    pickup_data: ReservationPickup,
+    db: AsyncSession = Depends(get_db),
+    current_admin: UserModel = Depends(get_current_admin)
+):
+    query = select(ReservationModel).options(
+        selectinload(ReservationModel.book),
+        selectinload(ReservationModel.user)
+    ).where(
+        ReservationModel.id == reservation_id
+    )
+
+    result = await db.execute(query)
+    reservation = result.scalar_one_or_none()
+
+    if not reservation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Reservation with id {reservation_id} not found"
+        )
+
+    if reservation.status != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot pick up reservation with status {reservation.status}. It must be 'READY'"
+        )
+
+    now = datetime.now(timezone.utc)
+    if reservation.expires_at and reservation.expires_at < now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This reservation has expired"
+        )
+
+    book_query = await db.execute(
+        select(BookModel)
+        .where(BookModel.id == reservation.book_id)
+        .with_for_update()
+    )
+
+    book = book_query.scalar_one_or_none()
+
+    if not book:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Book not found"
+        )
+
+    if book.quantity <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Book is currently out of stock"
+        )
+
+    existing_loan_query = await db.execute(
+        select(LoanModel)
+        .where(
+            LoanModel.user_id == reservation.user_id,
+            LoanModel.book_id == reservation.book_id,
+            LoanModel.status == "borrowed"
+        )
+    )
+
+    existing_loan = existing_loan_query.scalar_one_or_none()
+
+    if existing_loan:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User already has an active loan for this book"
+        )
+
+    active_loan_query = await db.execute(
+        select(LoanModel)
+        .where(
+            LoanModel.user_id == reservation.user_id,
+            LoanModel.status.in_(["borrowed", "overdue"])
+        )
+    )
+
+    active_loan = active_loan_query.scalars().all()
+
+    if len(active_loan) >= 5:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User already has 5 active loans"
+        )
+
+    book.quantity -= 1
+
+    due_date = now + timedelta(days=pickup_data.duration.value)
+    new_loan = LoanModel(
+        user_id=reservation.user_id,
+        book_id=reservation.book_id,
+        due_date=due_date
+    )
+
+    db.add(new_loan)
+
+    reservation.status = "picked_up"
+
+    await db.commit()
+    await db.refresh(new_loan)
+
+    return ReservationPickupResponse(
+        message="Book picked up successfully",
+        reservation_id=reservation_id,
+        user_email=reservation.user.email,
+        book_title=reservation.book.title,
+        loan_id=new_loan.id,
+        loan_date=now,
+        due_date=due_date,
+        duration_days=pickup_data.duration.value
     )
